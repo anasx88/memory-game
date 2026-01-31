@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>3D Memory Numbers</title>
+    <script type="module" crossorigin src="./assets/index-D6HtvvWt.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BsHPAgJc.css">
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="screenFlash" aria-hidden="true"></div>
+
+    <div id="ui">
+      <div id="hud" aria-label="Game HUD">
+        <div class="hudRow">
+          <div id="levelLabel">Level: 1</div>
+          <div id="timerLabel" aria-label="Input timer">Timer: --</div>
+        </div>
+        <div class="hudRow">
+          <div id="kbdLabel" aria-label="Keyboard input">Type: --</div>
+        </div>
+        <div class="hudRow">
+          <button id="startBtn" type="button">Start</button>
+          <button id="restartBtn" type="button" class="hidden">Restart</button>
+        </div>
+        <div id="hint" aria-hidden="true">Mouse: click tiles. Keyboard: type a number then Enter.</div>
+      </div>
+
+      <div id="gameOverPanel" class="panel hidden" role="status" aria-live="polite" aria-atomic="true">
+        <div class="panelTitle">Game Over</div>
+        <div class="panelText">Reset to Level 1.</div>
+      </div>
+
+      <div id="srPolite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      <div id="srAssert" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+    </div>
+
+  </body>
+</html>
