@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory 3D - GitHub Pages</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Memory 3D</div>
+    <div class="meta">
+      <span id="status">جاهز</span>
+      <button id="btnNew" class="btn">جولة جديدة</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <canvas id="game" width="960" height="540" aria-label="Game Canvas"></canvas>
+
+    <section class="panel">
+      <h1>التشغيل</h1>
+      <ol>
+        <li>ارفع هذا المشروع كما هو إلى GitHub.</li>
+        <li>فعّل GitHub Pages (Branch: main / Folder: /root).</li>
+        <li>افتح رابط Pages وسيعمل مباشرة بدون Terminal.</li>
+      </ol>
+
+      <h2>التحكم</h2>
+      <ul>
+        <li>النقر: اختيار بطاقة</li>
+        <li>R: إعادة الجولة</li>
+      </ul>
+
+      <h2>ملاحظات</h2>
+      <ul>
+        <li>هذا الإصدار لا يحتاج Atlas.</li>
+        <li>لا يوجد TypeScript build. تم تحويله إلى JavaScript مباشر.</li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- IMPORTANT: type="module" so imports work on GitHub Pages -->
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
