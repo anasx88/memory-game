@@ -1,40 +1,1692 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <title>3D Memory Numbers</title>
-  </head>
-  <body>
-    <div id="app"></div>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Recall - Skill Game</title>
+    <style>
+        :root {
+            /* Color Tokens */
+            --COLOR_BACKGROUND_MAIN: #0F172A;
+            --COLOR_CELL_BORDER: #94A3B8;
+            --COLOR_NUMBER_GOLD_HIGHLIGHT: #FFD966;
+            --COLOR_NUMBER_GOLD_BASE: #D4AF37;
+            --COLOR_NUMBER_GOLD_SHADOW: #8C6A1F;
+            --COLOR_TIMER_START: #22D3EE;
+            --COLOR_TIMER_MID: #FACC15;
+            --COLOR_TIMER_END: #EF4444;
+            --COLOR_FEEDBACK_SUCCESS: #22C55E;
+            --COLOR_FEEDBACK_ERROR: #EF4444;
+            
+            /* Time Tokens */
+            --TIME_FADE_IN: 0.20s;
+            --TIME_FADE_OUT: 0.15s;
+            
+            /* Layout Tokens */
+            --GRID_COLUMNS: 5;
+            --CELL_BORDER_WIDTH: 1px;
+            --CELL_OPACITY_DISPLAY: 0.20;
+            --CELL_OPACITY_INPUT: 0.12;
+            
+            /* Top Bar Height */
+            --TOP_BAR_HEIGHT: 60px;
+        }
 
-    <div id="screenFlash" aria-hidden="true"></div>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <div id="ui">
-      <div id="hud" aria-label="Game HUD">
-        <div class="hudRow">
-          <div id="levelLabel">Level: 1</div>
-          <div id="timerLabel" aria-label="Input timer">Timer: --</div>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--COLOR_BACKGROUND_MAIN);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+            direction: ltr;
+        }
+
+        body[dir="rtl"] {
+            direction: rtl;
+        }
+
+        .screen {
+            display: none;
+            min-height: 100vh;
+            padding: 20px;
+            padding-top: calc(var(--TOP_BAR_HEIGHT) + 20px);
+            animation: fadeIn var(--TIME_FADE_IN) ease-in;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen.no-top-bar {
+            padding-top: 20px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .fade-out {
+            animation: fadeOut var(--TIME_FADE_OUT) ease-out;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            background: linear-gradient(to bottom, 
+                var(--COLOR_NUMBER_GOLD_HIGHLIGHT) 0%, 
+                var(--COLOR_NUMBER_GOLD_BASE) 50%, 
+                var(--COLOR_NUMBER_GOLD_SHADOW) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        /* Buttons */
+        .btn {
+            background: linear-gradient(to bottom, 
+                var(--COLOR_NUMBER_GOLD_HIGHLIGHT), 
+                var(--COLOR_NUMBER_GOLD_BASE));
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #0F172A;
+            cursor: pointer;
+            border-radius: 8px;
+            margin: 10px;
+            transition: transform 0.1s, box-shadow 0.2s;
+            min-width: 200px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid var(--COLOR_CELL_BORDER);
+            color: var(--COLOR_CELL_BORDER);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+            color: var(--COLOR_NUMBER_GOLD_BASE);
+            box-shadow: 0 4px 12px rgba(148, 163, 184, 0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(to bottom, #ef4444, #dc2626);
+            color: white;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--TOP_BAR_HEIGHT);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .top-bar.hidden {
+            display: none;
+        }
+
+        .player-info {
+            font-weight: bold;
+            color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: 1px solid var(--COLOR_CELL_BORDER);
+            color: var(--COLOR_CELL_BORDER);
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+            color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        /* Language Select */
+        .lang-select {
+            justify-content: center;
+            align-items: center;
+        }
+
+        .lang-buttons {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .lang-btn {
+            font-size: 1.5rem;
+            padding: 30px 60px;
+        }
+
+        /* Player Select */
+        .player-list {
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .player-item {
+            background: rgba(148, 163, 184, 0.1);
+            border: 1px solid var(--COLOR_CELL_BORDER);
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .player-item:hover {
+            background: rgba(212, 175, 55, 0.1);
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+            transform: translateX(5px);
+        }
+
+        body[dir="rtl"] .player-item:hover {
+            transform: translateX(-5px);
+        }
+
+        .player-item.active {
+            background: rgba(212, 175, 55, 0.2);
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        .player-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .player-stats {
+            font-size: 0.9rem;
+            color: var(--COLOR_CELL_BORDER);
+            margin-top: 5px;
+        }
+
+        .player-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-field {
+            background: rgba(148, 163, 184, 0.1);
+            border: 1px solid var(--COLOR_CELL_BORDER);
+            color: white;
+            padding: 15px;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            margin: 10px 0;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        /* Instructions */
+        .instructions-content {
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.8;
+            font-size: 1.1rem;
+        }
+
+        .instructions-content p {
+            margin-bottom: 1rem;
+        }
+
+        .instructions-content ul {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        body[dir="rtl"] .instructions-content ul {
+            margin-left: 0;
+            margin-right: 2rem;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        /* Stats Dashboard */
+        .stats-container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .leaderboard {
+            background: rgba(148, 163, 184, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        body[dir="rtl"] th, 
+        body[dir="rtl"] td {
+            text-align: right;
+        }
+
+        th {
+            color: var(--COLOR_NUMBER_GOLD_BASE);
+            font-weight: bold;
+        }
+
+        .current-player-card {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05));
+            border: 1px solid var(--COLOR_NUMBER_GOLD_BASE);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .stat-label {
+            color: var(--COLOR_CELL_BORDER);
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: var(--COLOR_NUMBER_GOLD_HIGHLIGHT);
+        }
+
+        /* Level Select */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .level-btn {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--COLOR_CELL_BORDER);
+            background: rgba(148, 163, 184, 0.1);
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .level-btn:hover:not(.locked) {
+            transform: translateY(-5px);
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+            background: rgba(212, 175, 55, 0.1);
+        }
+
+        .level-btn.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .level-btn.completed {
+            border-color: var(--COLOR_FEEDBACK_SUCCESS);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .level-btn.current {
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+        }
+
+        .level-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .level-status {
+            font-size: 0.8rem;
+        }
+
+        .locked .level-status::after { content: "🔒"; }
+        .completed .level-status::after { content: "✓"; }
+        .current .level-status::after { content: "●"; }
+
+        /* Game Screen */
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding-top: 10px;
+        }
+
+        .timer-bar-container {
+            position: fixed;
+            top: var(--TOP_BAR_HEIGHT);
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: rgba(148, 163, 184, 0.2);
+            z-index: 100;
+        }
+
+        .timer-bar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(to right, 
+                var(--COLOR_TIMER_START) 0%, 
+                var(--COLOR_TIMER_MID) 50%, 
+                var(--COLOR_TIMER_END) 100%);
+            transform-origin: left;
+            transition: transform 0.1s linear;
+        }
+
+        body[dir="rtl"] .timer-bar {
+            transform-origin: right;
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            max-width: 600px;
+            width: 100%;
+            margin: 20px auto;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            border: var(--CELL_BORDER_WIDTH) solid var(--COLOR_CELL_BORDER);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            border-radius: 8px;
+            transition: all 0.2s;
+            background: rgba(148, 163, 184, var(--CELL_OPACITY_DISPLAY));
+        }
+
+        .cell.input-phase {
+            background: rgba(148, 163, 184, var(--CELL_OPACITY_INPUT));
+        }
+
+        .cell:hover:not(.disabled) {
+            border-color: var(--COLOR_NUMBER_GOLD_BASE);
+            border-width: 2px;
+        }
+
+        .cell:active:not(.disabled) {
+            background: rgba(212, 175, 55, 0.3);
+        }
+
+        .cell.disabled {
+            cursor: not-allowed;
+        }
+
+        .cell.error {
+            animation: shake 0.5s;
+            border-color: var(--COLOR_FEEDBACK_ERROR);
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .cell.success {
+            border-color: var(--COLOR_FEEDBACK_SUCCESS);
+            background: rgba(34, 197, 94, 0.2);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .cell-number {
+            background: linear-gradient(to bottom, 
+                var(--COLOR_NUMBER_GOLD_HIGHLIGHT) 0%, 
+                var(--COLOR_NUMBER_GOLD_BASE) 50%, 
+                var(--COLOR_NUMBER_GOLD_SHADOW) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.8rem;
+            pointer-events: none;
+        }
+
+        .cell-number.hidden {
+            display: none;
+        }
+
+        .phase-indicator {
+            text-align: center;
+            font-size: 1.2rem;
+            color: var(--COLOR_CELL_BORDER);
+            margin-bottom: 20px;
+            height: 30px;
+        }
+
+        .stage-indicator {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .stage-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(148, 163, 184, 0.3);
+        }
+
+        .stage-dot.active {
+            background: var(--COLOR_NUMBER_GOLD_BASE);
+            box-shadow: 0 0 10px var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        .stage-dot.completed {
+            background: var(--COLOR_FEEDBACK_SUCCESS);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--COLOR_BACKGROUND_MAIN);
+            border: 1px solid var(--COLOR_CELL_BORDER);
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        .modal-text {
+            margin-bottom: 20px;
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+
+        /* Settings */
+        .settings-section {
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .toggle {
+            width: 50px;
+            height: 26px;
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle.active {
+            background: var(--COLOR_NUMBER_GOLD_BASE);
+        }
+
+        .toggle-handle {
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .toggle.active .toggle-handle {
+            transform: translateX(24px);
+        }
+
+        .danger-zone {
+            margin-top: 40px;
+            padding: 20px;
+            border: 1px solid var(--COLOR_FEEDBACK_ERROR);
+            border-radius: 8px;
+        }
+
+        .danger-zone h3 {
+            color: var(--COLOR_FEEDBACK_ERROR);
+            margin-bottom: 15px;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .game-grid { gap: 5px; }
+            .cell-number { font-size: 1.2rem; }
+            .level-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <div class="top-bar hidden" id="topBar">
+        <div class="player-info" id="currentPlayerDisplay"></div>
+        <div class="top-bar-actions">
+            <button class="icon-btn" id="statsBtn" data-i18n="stats">Stats</button>
+            <button class="icon-btn" id="switchPlayerBtn" data-i18n="switchPlayer">Switch Player</button>
+            <button class="icon-btn" id="settingsBtn" data-i18n="settings">Settings</button>
         </div>
-        <div class="hudRow">
-          <div id="kbdLabel" aria-label="Keyboard input">Type: --</div>
-        </div>
-        <div class="hudRow">
-          <button id="startBtn" type="button">Start</button>
-          <button id="restartBtn" type="button" class="hidden">Restart</button>
-        </div>
-        <div id="hint" aria-hidden="true">Mouse: click tiles. Keyboard: type a number then Enter.</div>
-      </div>
-
-      <div id="gameOverPanel" class="panel hidden" role="status" aria-live="polite" aria-atomic="true">
-        <div class="panelTitle">Game Over</div>
-        <div class="panelText">Reset to Level 1.</div>
-      </div>
-
-      <div id="srPolite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
-      <div id="srAssert" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
     </div>
 
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+    <!-- Language Select -->
+    <div class="screen lang-select active no-top-bar" id="langSelect">
+        <h1 data-i18n="gameTitle">Number Recall</h1>
+        <div class="lang-buttons">
+            <button class="btn lang-btn" onclick="game.setLanguage('en')">English</button>
+            <button class="btn lang-btn" onclick="game.setLanguage('ar')">العربية</button>
+        </div>
+    </div>
+
+    <!-- Player Select -->
+    <div class="screen" id="playerSelect">
+        <h1 data-i18n="selectPlayer">Select Player</h1>
+        <div class="player-list" id="playerList"></div>
+        <div style="text-align: center; margin-top: 20px;">
+            <input type="text" class="input-field" id="newPlayerName" data-i18n-placeholder="enterName" placeholder="Enter name">
+            <br>
+            <button class="btn" onclick="game.addPlayer()" data-i18n="addPlayer">Add Player</button>
+            <button class="btn btn-secondary" onclick="game.showScreen('langSelect')" data-i18n="back">Back</button>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="screen" id="instructions">
+        <h1 data-i18n="howToPlay">How to Play</h1>
+        <div class="instructions-content">
+            <p data-i18n="instGoal"><strong>Goal:</strong> Remember the positions of numbers and click them in order (1→N) after they disappear.</p>
+            
+            <p data-i18n="instStages"><strong>Stages:</strong></p>
+            <ul>
+                <li data-i18n="instStage1">Numbers appear randomly on the grid</li>
+                <li data-i18n="instStage2">Numbers disappear - cells remain clickable</li>
+                <li data-i18n="instStage3">Click cells in order 1 to N before time runs out</li>
+            </ul>
+            
+            <p data-i18n="instLose"><strong>Losing:</strong> Wrong click or timeout returns you to Stage 1 of the current Level.</p>
+            <p data-i18n="instProgress"><strong>Progress:</strong> Complete Stage 3 to unlock the next Level. Progress is saved per player.</p>
+            
+            <label class="checkbox-container">
+                <input type="checkbox" id="skipInstructionsCheck">
+                <span data-i18n="skipNextTime">Skip instructions next time</span>
+            </label>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button class="btn" onclick="game.startFromInstructions()" data-i18n="start">Start</button>
+                <button class="btn btn-secondary" onclick="game.showScreen('playerSelect')" data-i18n="back">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Dashboard -->
+    <div class="screen" id="statsDashboard">
+        <h1 data-i18n="statsTitle">Statistics</h1>
+        <div class="stats-container">
+            <div class="current-player-card">
+                <h2 id="statsPlayerName"></h2>
+                <div class="stat-row">
+                    <span class="stat-label" data-i18n="highestLevel">Highest Level</span>
+                    <span class="stat-value" id="statHighestLevel">1</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label" data-i18n="highestStage">Highest Stage</span>
+                    <span class="stat-value" id="statHighestStage">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label" data-i18n="attempts">Attempts</span>
+                    <span class="stat-value" id="statAttempts">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label" data-i18n="failures">Failures</span>
+                    <span class="stat-value" id="statFailures">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label" data-i18n="bestTime">Best Time</span>
+                    <span class="stat-value" id="statBestTime">-</span>
+                </div>
+            </div>
+            
+            <div class="leaderboard">
+                <h2 data-i18n="leaderboard">Leaderboard</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th data-i18n="playerName">Player</th>
+                            <th data-i18n="highestLevelShort">Level</th>
+                            <th data-i18n="highestStageShort">Stage</th>
+                            <th data-i18n="bestTimeShort">Best</th>
+                            <th data-i18n="lastPlayed">Last Played</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody"></tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center;">
+                <button class="btn" onclick="game.showScreen('levelSelect')" data-i18n="continue">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Level Select -->
+    <div class="screen" id="levelSelect">
+        <h1 data-i18n="selectLevel">Select Level</h1>
+        <div class="level-grid" id="levelGrid"></div>
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-secondary" onclick="game.showScreen('statsDashboard')" data-i18n="back">Back</button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div class="screen no-top-bar" id="gameScreen">
+        <div class="timer-bar-container">
+            <div class="timer-bar" id="timerBar"></div>
+        </div>
+        <div class="game-container">
+            <div class="stage-indicator" id="stageIndicator">
+                <div class="stage-dot" id="dot1"></div>
+                <div class="stage-dot" id="dot2"></div>
+                <div class="stage-dot" id="dot3"></div>
+            </div>
+            <div class="phase-indicator" id="phaseIndicator"></div>
+            <div class="game-grid" id="gameGrid"></div>
+        </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="screen" id="settings">
+        <h1 data-i18n="settings">Settings</h1>
+        <div class="settings-section">
+            <div class="setting-item">
+                <span data-i18n="language">Language</span>
+                <select class="input-field" style="width: auto; min-width: 150px;" id="settingsLang" onchange="game.changeLanguage(this.value)">
+                    <option value="en">English</option>
+                    <option value="ar">العربية</option>
+                </select>
+            </div>
+            
+            <div class="setting-item">
+                <span data-i18n="sound">Sound</span>
+                <div class="toggle" id="soundToggle" onclick="game.toggleSound()">
+                    <div class="toggle-handle"></div>
+                </div>
+            </div>
+            
+            <div class="danger-zone">
+                <h3 data-i18n="dangerZone">Danger Zone</h3>
+                <button class="btn btn-danger" onclick="game.resetCurrentPlayer()" data-i18n="resetCurrent">Reset Current Player</button>
+                <button class="btn btn-danger" onclick="game.resetAllPlayers()" data-i18n="resetAll">Reset All Data</button>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button class="btn" onclick="game.backFromSettings()" data-i18n="back">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="modal-text" id="modalText"></div>
+            <button class="btn" id="modalBtn" onclick="game.closeModal()">OK</button>
+            <button class="btn btn-secondary" id="modalCancelBtn" onclick="game.closeModal()" style="display:none" data-i18n="cancel">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Configuration
+        const CONFIG = {
+            levels: [
+                {n: 5, label: "1"},
+                {n: 7, label: "2"},
+                {n: 10, label: "3"},
+                {n: 13, label: "4"},
+                {n: 17, label: "5"},
+                {n: 21, label: "6"},
+                {n: 25, label: "7"},
+                {n: 30, label: "8"},
+                {n: 35, label: "9"},
+                {n: 40, label: "10"},
+                {n: 46, label: "11"},
+                {n: 52, label: "12"},
+                {n: 60, label: "Super Hero"}
+            ],
+            stageTimes: {
+                1: 1.5,
+                2: 1.2,
+                3: 0.9
+            },
+            graceTime: 0.3,
+            maxPlayers: 10,
+            gridColumns: 5,
+            // Display Time Configuration
+            DISPLAY_BASE_START: 3.0,
+            DISPLAY_BASE_INCREMENT_PER_LEVEL: 0.5,
+            DISPLAY_TIME_PER_NUMBER: 0.4
+        };
+
+        // Translations
+        const i18n = {
+            en: {
+                gameTitle: "Number Recall",
+                selectPlayer: "Select Player",
+                addPlayer: "Add Player",
+                enterName: "Enter name",
+                back: "Back",
+                howToPlay: "How to Play",
+                instGoal: "<strong>Goal:</strong> Remember the positions of numbers and click them in order (1→N) after they disappear.",
+                instStages: "<strong>Stages:</strong>",
+                instStage1: "Numbers appear randomly on the grid",
+                instStage2: "Numbers disappear - cells remain clickable",
+                instStage3: "Click cells in order 1 to N before time runs out",
+                instLose: "<strong>Losing:</strong> Wrong click or timeout returns you to Stage 1 of the current Level.",
+                instProgress: "<strong>Progress:</strong> Complete Stage 3 to unlock the next Level. Progress is saved per player.",
+                skipNextTime: "Skip instructions next time",
+                start: "Start",
+                statsTitle: "Statistics",
+                highestLevel: "Highest Level",
+                highestStage: "Highest Stage",
+                attempts: "Attempts",
+                failures: "Failures",
+                bestTime: "Best Time",
+                leaderboard: "Leaderboard",
+                playerName: "Player",
+                highestLevelShort: "Level",
+                highestStageShort: "Stage",
+                bestTimeShort: "Best",
+                lastPlayed: "Last Played",
+                continue: "Continue",
+                selectLevel: "Select Level",
+                locked: "Locked",
+                stage: "Stage",
+                remember: "Remember the positions...",
+                go: "Go! Click in order 1→",
+                wrong: "Wrong! Try again.",
+                timeout: "Time's up!",
+                levelComplete: "Level Complete!",
+                stageComplete: "Stage Complete!",
+                unlocked: "Unlocked Level ",
+                confirmDelete: "Are you sure you want to delete this player?",
+                confirmReset: "Are you sure you want to reset this player's progress?",
+                confirmResetAll: "WARNING: This will delete ALL players and data. Are you sure?",
+                maxPlayers: "Maximum 10 players reached. Please delete a player first.",
+                nameExists: "Name already exists. Please choose another.",
+                emptyName: "Please enter a name.",
+                switchPlayer: "Switch",
+                settings: "Settings",
+                stats: "Stats",
+                language: "Language",
+                sound: "Sound",
+                dangerZone: "Danger Zone",
+                resetCurrent: "Reset Current Player",
+                resetAll: "Reset All Data",
+                cancel: "Cancel",
+                superHero: "Super Hero"
+            },
+            ar: {
+                gameTitle: "تذكر الأرقام",
+                selectPlayer: "اختر اللاعب",
+                addPlayer: "إضافة لاعب",
+                enterName: "أدخل الاسم",
+                back: "رجوع",
+                howToPlay: "كيفية اللعب",
+                instGoal: "<strong>الهدف:</strong> تذكر مواقع الأرقام واضغط عليها بالترتيب (1→N) بعد اختفائها.",
+                instStages: "<strong>المراحل:</strong>",
+                instStage1: "تظهر الأرقام بشكل عشوائي على الشبكة",
+                instStage2: "تختفي الأرقام - تبقى الخلايا قابلة للضغط",
+                instStage3: "اضغط الخلايا بالترتيب من 1 إلى N قبل نفاد الوقت",
+                instLose: "<strong>الخسارة:</strong> ضغط خاطئ أو نفاد الوقت يعيدك إلى المرحلة 1 من نفس المستوى.",
+                instProgress: "<strong>التقدم:</strong> أكمل المرحلة 3 لفتح المستوى التالي. يحفظ التقدم لكل لاعب.",
+                skipNextTime: "تخطي التعليمات المرة القادمة",
+                start: "ابدأ",
+                statsTitle: "الإحصائيات",
+                highestLevel: "أعلى مستوى",
+                highestStage: "أعلى مرحلة",
+                attempts: "المحاولات",
+                failures: "الإخفاقات",
+                bestTime: "أفضل وقت",
+                leaderboard: "لوحة المتصدرين",
+                playerName: "اللاعب",
+                highestLevelShort: "المستوى",
+                highestStageShort: "المرحلة",
+                bestTimeShort: "الأفضل",
+                lastPlayed: "آخر لعب",
+                continue: "استمرار",
+                selectLevel: "اختر المستوى",
+                locked: "مغلق",
+                stage: "المرحلة",
+                remember: "تذكر المواقع...",
+                go: "انطلق! اضغط بالترتيب 1→",
+                wrong: "خطأ! حاول مرة أخرى.",
+                timeout: "انتهى الوقت!",
+                levelComplete: "اكتمل المستوى!",
+                stageComplete: "اكتملت المرحلة!",
+                unlocked: "تم فتح المستوى ",
+                confirmDelete: "هل أنت متأكد من حذف هذا اللاعب؟",
+                confirmReset: "هل أنت متأكد من إعادة تعيين تقدم هذا اللاعب؟",
+                confirmResetAll: "تحذير: سيحذف هذا جميع اللاعبين والبيانات. هل أنت متأكد؟",
+                maxPlayers: "تم الوصول للحد الأقصى (10 لاعبين). يرجى حذف لاعب أولاً.",
+                nameExists: "الاسم موجود مسبقاً. يرجى اختيار اسم آخر.",
+                emptyName: "يرجى إدخال اسم.",
+                switchPlayer: "تبديل",
+                settings: "الإعدادات",
+                stats: "إحصائيات",
+                language: "اللغة",
+                sound: "الصوت",
+                dangerZone: "منطقة الخطر",
+                resetCurrent: "إعادة تعيين اللاعب الحالي",
+                resetAll: "إعادة تعيير جميع البيانات",
+                cancel: "إلغاء",
+                superHero: "البطل الخارق"
+            }
+        };
+
+        // Game State
+        const state = {
+            lang: localStorage.getItem('NR_LANG') || 'en',
+            players: JSON.parse(localStorage.getItem('NR_PLAYERS') || '[]'),
+            activePlayerId: localStorage.getItem('NR_ACTIVE_PLAYER_ID') || null,
+            currentScreen: 'langSelect',
+            game: {
+                level: 1,
+                stage: 1,
+                numbers: [],
+                currentNumber: 1,
+                timer: null,
+                timeLeft: 0,
+                totalTime: 0,
+                isInputPhase: false,
+                gridSize: 0,
+                displayTime: 0
+            },
+            settings: {
+                sound: false
+            }
+        };
+
+        // Initialize
+        const game = {
+            init() {
+                this.loadLanguage();
+                this.updatePlayerDisplay();
+                
+                if (state.activePlayerId && this.getActivePlayer()) {
+                    const player = this.getActivePlayer();
+                    if (player.skipInstructions) {
+                        this.showScreen('statsDashboard');
+                    } else {
+                        this.showScreen('instructions');
+                    }
+                } else if (state.players.length > 0) {
+                    this.showScreen('playerSelect');
+                } else {
+                    this.showScreen('langSelect');
+                }
+                
+                this.attachEventListeners();
+            },
+
+            attachEventListeners() {
+                document.getElementById('statsBtn').onclick = () => this.showScreen('statsDashboard');
+                document.getElementById('switchPlayerBtn').onclick = () => this.showScreen('playerSelect');
+                document.getElementById('settingsBtn').onclick = () => this.showScreen('settings');
+                document.getElementById('newPlayerName').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.addPlayer();
+                });
+            },
+
+            // Language Management
+            setLanguage(lang) {
+                state.lang = lang;
+                localStorage.setItem('NR_LANG', lang);
+                this.loadLanguage();
+                
+                if (state.players.length === 0) {
+                    this.showScreen('playerSelect');
+                } else {
+                    this.showScreen('playerSelect');
+                }
+            },
+
+            changeLanguage(lang) {
+                state.lang = lang;
+                localStorage.setItem('NR_LANG', lang);
+                this.loadLanguage();
+                this.renderPlayerList();
+                this.renderStats();
+                this.renderLevelSelect();
+            },
+
+            loadLanguage() {
+                document.body.setAttribute('dir', state.lang === 'ar' ? 'rtl' : 'ltr');
+                document.getElementById('settingsLang').value = state.lang;
+                
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if (i18n[state.lang][key]) {
+                        el.textContent = i18n[state.lang][key];
+                    }
+                });
+                
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                    const key = el.getAttribute('data-i18n-placeholder');
+                    if (i18n[state.lang][key]) {
+                        el.placeholder = i18n[state.lang][key];
+                    }
+                });
+            },
+
+            t(key) {
+                return i18n[state.lang][key] || key;
+            },
+
+            // Screen Management
+            showScreen(screenId) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(screenId).classList.add('active');
+                state.currentScreen = screenId;
+                
+                const topBar = document.getElementById('topBar');
+                const screen = document.getElementById(screenId);
+                
+                // Show/hide top bar and adjust padding
+                if (screenId === 'langSelect' || screenId === 'gameScreen') {
+                    topBar.classList.add('hidden');
+                    screen.classList.add('no-top-bar');
+                } else {
+                    topBar.classList.remove('hidden');
+                    screen.classList.remove('no-top-bar');
+                    this.updatePlayerDisplay();
+                }
+                
+                // Screen specific initialization
+                if (screenId === 'playerSelect') this.renderPlayerList();
+                if (screenId === 'statsDashboard') this.renderStats();
+                if (screenId === 'levelSelect') this.renderLevelSelect();
+                if (screenId === 'settings') this.loadSettings();
+            },
+
+            // Player Management
+            getActivePlayer() {
+                return state.players.find(p => p.id === state.activePlayerId);
+            },
+
+            addPlayer() {
+                const nameInput = document.getElementById('newPlayerName');
+                let name = nameInput.value.trim();
+                
+                if (!name) {
+                    this.showModal(this.t('emptyName'), null, false);
+                    return;
+                }
+                
+                if (state.players.length >= CONFIG.maxPlayers) {
+                    this.showModal(this.t('maxPlayers'), null, false);
+                    return;
+                }
+                
+                // Check for duplicates and append number if needed
+                const existingNames = state.players.map(p => p.name);
+                let finalName = name;
+                let counter = 2;
+                while (existingNames.includes(finalName)) {
+                    finalName = `${name} (${counter})`;
+                    counter++;
+                }
+                
+                const newPlayer = {
+                    id: Date.now().toString(),
+                    name: finalName,
+                    highestLevelUnlocked: 1,
+                    highestStageByLevel: {},
+                    bestTimes: {},
+                    attempts: 0,
+                    failures: 0,
+                    lastPlayed: new Date().toISOString(),
+                    skipInstructions: false
+                };
+                
+                state.players.push(newPlayer);
+                state.activePlayerId = newPlayer.id;
+                this.savePlayers();
+                
+                nameInput.value = '';
+                this.showScreen('instructions');
+            },
+
+            selectPlayer(playerId) {
+                state.activePlayerId = playerId;
+                localStorage.setItem('NR_ACTIVE_PLAYER_ID', playerId);
+                this.updatePlayerDisplay();
+                
+                const player = this.getActivePlayer();
+                player.lastPlayed = new Date().toISOString();
+                this.savePlayers();
+                
+                if (player.skipInstructions) {
+                    this.showScreen('statsDashboard');
+                } else {
+                    this.showScreen('instructions');
+                }
+            },
+
+            deletePlayer(playerId, event) {
+                event.stopPropagation();
+                this.showModal(this.t('confirmDelete'), () => {
+                    state.players = state.players.filter(p => p.id !== playerId);
+                    if (state.activePlayerId === playerId) {
+                        state.activePlayerId = null;
+                        localStorage.removeItem('NR_ACTIVE_PLAYER_ID');
+                    }
+                    this.savePlayers();
+                    this.renderPlayerList();
+                }, true);
+            },
+
+            savePlayers() {
+                localStorage.setItem('NR_PLAYERS', JSON.stringify(state.players));
+                if (state.activePlayerId) {
+                    localStorage.setItem('NR_ACTIVE_PLAYER_ID', state.activePlayerId);
+                }
+            },
+
+            updatePlayerDisplay() {
+                const player = this.getActivePlayer();
+                document.getElementById('currentPlayerDisplay').textContent = player ? player.name : '';
+            },
+
+            renderPlayerList() {
+                const list = document.getElementById('playerList');
+                list.innerHTML = '';
+                
+                state.players.forEach(player => {
+                    const div = document.createElement('div');
+                    div.className = 'player-item' + (player.id === state.activePlayerId ? ' active' : '');
+                    div.onclick = () => this.selectPlayer(player.id);
+                    
+                    const info = document.createElement('div');
+                    const name = document.createElement('div');
+                    name.className = 'player-name';
+                    name.textContent = player.name;
+                    
+                    const stats = document.createElement('div');
+                    stats.className = 'player-stats';
+                    stats.textContent = `${this.t('highestLevelShort')}: ${player.highestLevelUnlocked} | ${this.t('highestStageShort')}: ${player.highestStageByLevel[player.highestLevelUnlocked] || 0}/3`;
+                    
+                    info.appendChild(name);
+                    info.appendChild(stats);
+                    
+                    const actions = document.createElement('div');
+                    actions.className = 'player-actions';
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'icon-btn';
+                    deleteBtn.textContent = '×';
+                    deleteBtn.onclick = (e) => this.deletePlayer(player.id, e);
+                    
+                    actions.appendChild(deleteBtn);
+                    div.appendChild(info);
+                    div.appendChild(actions);
+                    list.appendChild(div);
+                });
+            },
+
+            // Instructions
+            startFromInstructions() {
+                const skip = document.getElementById('skipInstructionsCheck').checked;
+                const player = this.getActivePlayer();
+                if (player) {
+                    player.skipInstructions = skip;
+                    this.savePlayers();
+                }
+                this.showScreen('statsDashboard');
+            },
+
+            // Stats Dashboard
+            renderStats() {
+                const player = this.getActivePlayer();
+                if (!player) return;
+                
+                document.getElementById('statsPlayerName').textContent = player.name;
+                document.getElementById('statHighestLevel').textContent = player.highestLevelUnlocked;
+                
+                const currentLevelStage = player.highestStageByLevel[player.highestLevelUnlocked] || 0;
+                document.getElementById('statHighestStage').textContent = currentLevelStage;
+                document.getElementById('statAttempts').textContent = player.attempts;
+                document.getElementById('statFailures').textContent = player.failures;
+                
+                // Calculate best time overall
+                let bestTime = Infinity;
+                Object.values(player.bestTimes).forEach(time => {
+                    if (time < bestTime) bestTime = time;
+                });
+                document.getElementById('statBestTime').textContent = bestTime === Infinity ? '-' : bestTime.toFixed(2) + 's';
+                
+                // Render leaderboard
+                const tbody = document.getElementById('leaderboardBody');
+                tbody.innerHTML = '';
+                
+                const sortedPlayers = [...state.players].sort((a, b) => {
+                    if (b.highestLevelUnlocked !== a.highestLevelUnlocked) {
+                        return b.highestLevelUnlocked - a.highestLevelUnlocked;
+                    }
+                    const bStage = b.highestStageByLevel[b.highestLevelUnlocked] || 0;
+                    const aStage = a.highestStageByLevel[a.highestLevelUnlocked] || 0;
+                    return bStage - aStage;
+                });
+                
+                sortedPlayers.forEach(p => {
+                    const row = document.createElement('tr');
+                    const bestTimeStr = Object.values(p.bestTimes).length > 0 
+                        ? Math.min(...Object.values(p.bestTimes)).toFixed(2) + 's' 
+                        : '-';
+                    const lastPlayed = new Date(p.lastPlayed).toLocaleDateString();
+                    
+                    row.innerHTML = `
+                        <td>${p.name}</td>
+                        <td>${p.highestLevelUnlocked}</td>
+                        <td>${p.highestStageByLevel[p.highestLevelUnlocked] || 0}/3</td>
+                        <td>${bestTimeStr}</td>
+                        <td>${lastPlayed}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            },
+
+            // Level Select
+            renderLevelSelect() {
+                const grid = document.getElementById('levelGrid');
+                grid.innerHTML = '';
+                const player = this.getActivePlayer();
+                
+                CONFIG.levels.forEach((level, index) => {
+                    const levelNum = index + 1;
+                    const btn = document.createElement('div');
+                    btn.className = 'level-btn';
+                    
+                    const isLocked = levelNum > player.highestLevelUnlocked;
+                    const isCompleted = levelNum < player.highestLevelUnlocked;
+                    const isCurrent = levelNum === player.highestLevelUnlocked;
+                    
+                    if (isLocked) btn.classList.add('locked');
+                    if (isCompleted) btn.classList.add('completed');
+                    if (isCurrent) btn.classList.add('current');
+                    
+                    if (!isLocked) {
+                        btn.onclick = () => this.startLevel(levelNum);
+                    }
+                    
+                    const num = document.createElement('div');
+                    num.className = 'level-number';
+                    num.textContent = level.label;
+                    
+                    const status = document.createElement('div');
+                    status.className = 'level-status';
+                    
+                    btn.appendChild(num);
+                    btn.appendChild(status);
+                    grid.appendChild(btn);
+                });
+            },
+
+            // Game Logic
+            startLevel(levelNum) {
+                state.game.level = levelNum;
+                state.game.stage = 1;
+                this.startStage();
+            },
+
+            startStage() {
+                const levelConfig = CONFIG.levels[state.game.level - 1];
+                const n = levelConfig.n;
+                const stageTime = CONFIG.stageTimes[state.game.stage];
+                const totalInputTime = (n * stageTime) + CONFIG.graceTime;
+                
+                // Calculate Display Time based on new formula (independent of stage)
+                // Base Time = 3.0 + (0.5 * Level)
+                // DisplayTime = Base Time + (0.4 * N)
+                const baseTime = CONFIG.DISPLAY_BASE_START + (CONFIG.DISPLAY_BASE_INCREMENT_PER_LEVEL * state.game.level);
+                const displayTime = baseTime + (CONFIG.DISPLAY_TIME_PER_NUMBER * n);
+                
+                state.game.numbers = this.generateRandomGrid(n);
+                state.game.currentNumber = 1;
+                state.game.totalTime = totalInputTime;
+                state.game.timeLeft = totalInputTime;
+                state.game.isInputPhase = false;
+                state.game.gridSize = n;
+                state.game.displayTime = displayTime;
+                
+                this.showScreen('gameScreen');
+                this.renderGrid();
+                this.updateStageIndicator();
+                
+                // Show phase indicator with count down for display phase
+                const indicator = document.getElementById('phaseIndicator');
+                indicator.textContent = this.t('remember');
+                indicator.style.color = 'var(--COLOR_NUMBER_GOLD_BASE)';
+                
+                // Update timer bar to show display progress
+                const timerBar = document.getElementById('timerBar');
+                timerBar.style.background = 'var(--COLOR_NUMBER_GOLD_BASE)';
+                timerBar.style.transform = 'scaleX(1)';
+                
+                // Start display countdown
+                let displayTimeLeft = displayTime;
+                const displayInterval = setInterval(() => {
+                    displayTimeLeft -= 0.1;
+                    const progress = displayTimeLeft / displayTime;
+                    timerBar.style.transform = `scaleX(${Math.max(0, progress)})`;
+                    
+                    if (displayTimeLeft <= 0) {
+                        clearInterval(displayInterval);
+                        this.startInputPhase();
+                    }
+                }, 100);
+            },
+
+            generateRandomGrid(n) {
+                const positions = [];
+                
+                // Generate random positions
+                for (let i = 0; i < n; i++) {
+                    positions.push(i + 1);
+                }
+                
+                // Shuffle
+                for (let i = positions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [positions[i], positions[j]] = [positions[j], positions[i]];
+                }
+                
+                return positions;
+            },
+
+            renderGrid() {
+                const grid = document.getElementById('gameGrid');
+                grid.innerHTML = '';
+                
+                const rows = Math.ceil(state.game.gridSize / CONFIG.gridColumns);
+                grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+                
+                for (let i = 0; i < state.game.gridSize; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.index = i;
+                    cell.onclick = () => this.handleCellClick(i);
+                    
+                    const number = state.game.numbers[i];
+                    const numSpan = document.createElement('span');
+                    numSpan.className = 'cell-number';
+                    numSpan.textContent = number;
+                    numSpan.id = `num-${i}`;
+                    
+                    cell.appendChild(numSpan);
+                    grid.appendChild(cell);
+                }
+            },
+
+            startInputPhase() {
+                state.game.isInputPhase = true;
+                
+                // Hide numbers
+                document.querySelectorAll('.cell-number').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.cell').forEach(el => el.classList.add('input-phase'));
+                
+                // Update indicator
+                const indicator = document.getElementById('phaseIndicator');
+                indicator.textContent = this.t('go') + state.game.gridSize;
+                indicator.style.color = 'var(--COLOR_TIMER_START)';
+                
+                // Reset timer bar for input phase
+                const timerBar = document.getElementById('timerBar');
+                timerBar.style.transform = 'scaleX(1)';
+                
+                // Start input timer
+                this.startTimer();
+                
+                // Update attempts
+                const player = this.getActivePlayer();
+                player.attempts++;
+                this.savePlayers();
+            },
+
+            startTimer() {
+                const startTime = Date.now();
+                const timerBar = document.getElementById('timerBar');
+                
+                state.game.timer = setInterval(() => {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    state.game.timeLeft = Math.max(0, state.game.totalTime - elapsed);
+                    
+                    const progress = state.game.timeLeft / state.game.totalTime;
+                    timerBar.style.transform = `scaleX(${progress})`;
+                    
+                    // Update color based on progress
+                    if (progress > 0.5) {
+                        timerBar.style.background = 'var(--COLOR_TIMER_START)';
+                    } else if (progress > 0.25) {
+                        timerBar.style.background = 'var(--COLOR_TIMER_MID)';
+                    } else {
+                        timerBar.style.background = 'var(--COLOR_TIMER_END)';
+                    }
+                    
+                    if (state.game.timeLeft <= 0) {
+                        this.handleTimeout();
+                    }
+                }, 16);
+            },
+
+            handleCellClick(index) {
+                if (!state.game.isInputPhase) return;
+                
+                const cellNumber = state.game.numbers[index];
+                const expectedNumber = state.game.currentNumber;
+                
+                if (cellNumber === expectedNumber) {
+                    // Correct
+                    const cell = document.querySelector(`.cell[data-index="${index}"]`);
+                    cell.classList.add('success');
+                    cell.classList.add('disabled');
+                    
+                    // Show number temporarily
+                    const numEl = document.getElementById(`num-${index}`);
+                    numEl.classList.remove('hidden');
+                    
+                    state.game.currentNumber++;
+                    
+                    if (state.game.currentNumber > state.game.gridSize) {
+                        this.handleStageComplete();
+                    }
+                } else {
+                    // Wrong
+                    const cell = document.querySelector(`.cell[data-index="${index}"]`);
+                    cell.classList.add('error');
+                    setTimeout(() => cell.classList.remove('error'), 500);
+                    this.handleFailure();
+                }
+            },
+
+            handleStageComplete() {
+                clearInterval(state.game.timer);
+                state.game.isInputPhase = false;
+                
+                const player = this.getActivePlayer();
+                
+                if (state.game.stage === 3) {
+                    // Level complete
+                    const timeTaken = state.game.totalTime - state.game.timeLeft;
+                    const key = `${state.game.level}_${state.game.stage}`;
+                    
+                    if (!player.bestTimes[key] || timeTaken < player.bestTimes[key]) {
+                        player.bestTimes[key] = timeTaken;
+                    }
+                    
+                    // Update highest stage for this level
+                    if (!player.highestStageByLevel[state.game.level] || state.game.stage > player.highestStageByLevel[state.game.level]) {
+                        player.highestStageByLevel[state.game.level] = state.game.stage;
+                    }
+                    
+                    // Unlock next level
+                    if (state.game.level < CONFIG.levels.length && state.game.level === player.highestLevelUnlocked) {
+                        player.highestLevelUnlocked++;
+                    }
+                    
+                    this.savePlayers();
+                    
+                    setTimeout(() => {
+                        this.showModal(this.t('levelComplete') + '\n' + this.t('unlocked') + (state.game.level + 1 <= CONFIG.levels.length ? state.game.level + 1 : ''), () => {
+                            this.showScreen('levelSelect');
+                        }, false);
+                    }, 500);
+                } else {
+                    // Stage complete, go to next stage
+                    player.highestStageByLevel[state.game.level] = state.game.stage;
+                    this.savePlayers();
+                    
+                    setTimeout(() => {
+                        state.game.stage++;
+                        this.startStage();
+                    }, 1000);
+                }
+            },
+
+            handleFailure() {
+                clearInterval(state.game.timer);
+                state.game.isInputPhase = false;
+                
+                const player = this.getActivePlayer();
+                player.failures++;
+                this.savePlayers();
+                
+                setTimeout(() => {
+                    this.showModal(this.t('wrong'), () => {
+                        // Restart from stage 1 of same level
+                        state.game.stage = 1;
+                        this.startStage();
+                    }, false);
+                }, 500);
+            },
+
+            handleTimeout() {
+                clearInterval(state.game.timer);
+                state.game.isInputPhase = false;
+                
+                const player = this.getActivePlayer();
+                player.failures++;
+                this.savePlayers();
+                
+                this.showModal(this.t('timeout'), () => {
+                    // Restart from stage 1 of same level
+                    state.game.stage = 1;
+                    this.startStage();
+                }, false);
+            },
+
+            updateStageIndicator() {
+                const dots = document.querySelectorAll('.stage-dot');
+                dots.forEach((dot, index) => {
+                    dot.classList.remove('active', 'completed');
+                    if (index < state.game.stage - 1) {
+                        dot.classList.add('completed');
+                    } else if (index === state.game.stage - 1) {
+                        dot.classList.add('active');
+                    }
+                });
+            },
+
+            // Settings
+            loadSettings() {
+                document.getElementById('settingsLang').value = state.lang;
+                document.getElementById('soundToggle').classList.toggle('active', state.settings.sound);
+            },
+
+            toggleSound() {
+                state.settings.sound = !state.settings.sound;
+                document.getElementById('soundToggle').classList.toggle('active', state.settings.sound);
+            },
+
+            resetCurrentPlayer() {
+                this.showModal(this.t('confirmReset'), () => {
+                    const player = this.getActivePlayer();
+                    if (player) {
+                        player.highestLevelUnlocked = 1;
+                        player.highestStageByLevel = {};
+                        player.bestTimes = {};
+                        player.attempts = 0;
+                        player.failures = 0;
+                        player.skipInstructions = false;
+                        this.savePlayers();
+                        this.showScreen('statsDashboard');
+                    }
+                }, true);
+            },
+
+            resetAllPlayers() {
+                this.showModal(this.t('confirmResetAll'), () => {
+                    state.players = [];
+                    state.activePlayerId = null;
+                    localStorage.removeItem('NR_PLAYERS');
+                    localStorage.removeItem('NR_ACTIVE_PLAYER_ID');
+                    this.showScreen('langSelect');
+                }, true);
+            },
+
+            backFromSettings() {
+                if (state.activePlayerId) {
+                    this.showScreen('statsDashboard');
+                } else {
+                    this.showScreen('langSelect');
+                }
+            },
+
+            // Modal
+            showModal(message, callback, showCancel) {
+                const modal = document.getElementById('modal');
+                document.getElementById('modalText').innerHTML = message;
+                
+                this.modalCallback = callback;
+                
+                const cancelBtn = document.getElementById('modalCancelBtn');
+                cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
+                
+                modal.classList.add('active');
+            },
+
+            closeModal() {
+                const modal = document.getElementById('modal');
+                modal.classList.remove('active');
+                
+                if (this.modalCallback) {
+                    this.modalCallback();
+                    this.modalCallback = null;
+                }
+            }
+        };
+
+        // Start game
+        game.init();
+    </script>
+</body>
 </html>
